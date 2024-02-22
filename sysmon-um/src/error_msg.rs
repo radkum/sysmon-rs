@@ -17,8 +17,6 @@ pub(crate) fn print_last_error(msg: &str) {
 }
 
 pub(crate) fn get_error_as_string(error_msg_id: u32) -> Option<String> {
-    //println!("error_msg_id: 0x{:08x}", error_msg_id);
-    let mut msg = None;
     unsafe {
         let mut message_buffer = null_mut();
         let chars = FormatMessageW(
@@ -33,7 +31,7 @@ pub(crate) fn get_error_as_string(error_msg_id: u32) -> Option<String> {
             null_mut(),
         );
 
-        msg = if chars > 0 {
+        let msg = if chars > 0 {
             let parts = std::slice::from_raw_parts(message_buffer, chars as _);
             String::from_utf16(parts).ok()
         } else {
@@ -41,10 +39,12 @@ pub(crate) fn get_error_as_string(error_msg_id: u32) -> Option<String> {
         };
 
         LocalFree(message_buffer as *mut c_void);
+
+        msg
     }
-    msg
 }
 
+#[allow(dead_code)]
 fn get_last_error_as_string() -> Option<String> {
     unsafe {
         //Get the error message, if any.
@@ -53,30 +53,28 @@ fn get_last_error_as_string() -> Option<String> {
             return Some(String::from("STATUS_SUCCESS"));
         }
 
-        let mut msg = None;
-        unsafe {
-            let mut message_buffer = null_mut();
-            let chars = FormatMessageW(
-                FORMAT_MESSAGE_ALLOCATE_BUFFER
-                    | FORMAT_MESSAGE_FROM_SYSTEM
-                    | FORMAT_MESSAGE_IGNORE_INSERTS,
-                null_mut(),
-                error_msg_id,
-                0,
-                &mut message_buffer as *mut *mut u16 as *mut u16,
-                0,
-                null_mut(),
-            );
+        let mut message_buffer = null_mut();
+        let chars = FormatMessageW(
+            FORMAT_MESSAGE_ALLOCATE_BUFFER
+                | FORMAT_MESSAGE_FROM_SYSTEM
+                | FORMAT_MESSAGE_IGNORE_INSERTS,
+            null_mut(),
+            error_msg_id,
+            0,
+            &mut message_buffer as *mut *mut u16 as *mut u16,
+            0,
+            null_mut(),
+        );
 
-            msg = if chars > 0 {
-                let parts = std::slice::from_raw_parts(message_buffer, chars as _);
-                String::from_utf16(parts).ok()
-            } else {
-                None
-            };
+        let msg = if chars > 0 {
+            let parts = std::slice::from_raw_parts(message_buffer, chars as _);
+            String::from_utf16(parts).ok()
+        } else {
+            None
+        };
 
-            LocalFree(message_buffer as *mut c_void);
-        }
+        LocalFree(message_buffer as *mut c_void);
+
         msg
     }
 }
