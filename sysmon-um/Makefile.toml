@@ -8,7 +8,13 @@ TARGET_PATH = "target\\debug"
 TARGET_PATH = "target\\release"
 BUILD_FLAGS = "--release"
 
+[tasks.format]
+command = "cargo"
+args = ["fmt"]
+toolchain = "nightly"
+
 [tasks.build-client]
+dependencies = ["format"]
 script = [
     "cargo b %BUILD_FLAGS%"
 ]

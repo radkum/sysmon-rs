@@ -8,21 +8,29 @@ TARGET_PATH = "target\\x86_64-pc-windows-msvc\\debug"
 TARGET_PATH = "target\\x86_64-pc-windows-msvc\\release"
 BUILD_FLAGS = "--release"
 
+[tasks.clean]
+command = "cargo"
+args = ["clean"]
+
+[tasks.format]
+command = "cargo"
+args = ["fmt"]
+
 [tasks.build-driver]
+dependencies = ["format"]
 script = [
-    "cargo b %BUILD_FLAGS%"
+    "cargo build %BUILD_FLAGS%",
 ]
 
 [tasks.rename]
 dependencies = ["build-driver"]
-ignore_errors = true
+cwd = "${TARGET_PATH}"
 script = [
-    "cd %TARGET_PATH%",
-    "rename %DRIVER_NAME%.dll %DRIVER_NAME%.sys",
+    "rename %DRIVER_NAME%.dll %DRIVER_NAME%.sys"
 ]
 
 [tasks.sign]
-dependencies = ["build-driver", "rename"]
+dependencies = ["rename"]
 script = [
     # Load the Visual Studio Developer environment
     "call \"%ProgramFiles(x86)%\\Microsoft Visual Studio\\2019\\Professional\\VC\\Auxiliary\\Build\\vcvars64.bat\"",
@@ -45,7 +53,7 @@ script = [
 dependencies = ["build-driver", "rename", "sign", "copy"]
 
 [tasks.rebuild]
-script = [
-    "cargo clean",
-    "cargo make all"
+dependencies = [
+    "clean",
+    "all",
 ]
