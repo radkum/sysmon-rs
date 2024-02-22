@@ -1,0 +1,29 @@
+[env]
+EXE_NAME = "sysmon-client"
+
+[env.development]
+TARGET_PATH = "target\\debug"
+
+[env.production]
+TARGET_PATH = "target\\release"
+BUILD_FLAGS = "--release"
+
+[tasks.build-client]
+script = [
+    "cargo b %BUILD_FLAGS%"
+]
+
+[tasks.copy]
+script = [
+    "IF not exist myDirName (mkdir ..\\output)",
+    "COPY %TARGET_PATH%\\%EXE_NAME%.exe .\\..\\output",
+]
+
+[tasks.all]
+dependencies = ["build-client", "copy"]
+
+[tasks.rebuild]
+script = [
+    "cargo clean",
+    "cargo make all"
+]
