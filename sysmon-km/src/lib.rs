@@ -35,9 +35,16 @@ use km_api_sys::{
     },
 };
 
-use alloc::{collections::VecDeque, string::ToString, vec::Vec};
-use core::{mem::forget, ptr, ptr::null_mut};
-use core::mem::size_of;
+use alloc::{
+    //collections::VecDeque,
+    string::ToString,
+    vec::Vec,
+};
+use core::{
+    mem::{forget, size_of},
+    ptr,
+    ptr::null_mut,
+};
 use log::LevelFilter;
 use winapi::{
     km::wdm::{
@@ -262,12 +269,10 @@ extern "system" fn DispatchRead(_driver: &mut DEVICE_OBJECT, irp: &mut IRP) -> N
         let buffer = buffer as *mut u8;
         let copied_bytes = copy_events_to_ptr(buffer, len as usize);
         if copied_bytes == 0 {
-            return complete_irp_with_status(irp, STATUS_INSUFFICIENT_RESOURCES)
+            return complete_irp_with_status(irp, STATUS_INSUFFICIENT_RESOURCES);
         }
 
         log::info!("DispatchRead success, copied bytes: {copied_bytes}");
-
-        //log_items();
 
         complete_irp(irp, STATUS_SUCCESS, copied_bytes)
     }
@@ -310,7 +315,6 @@ extern "system" fn OnProcessNotify(
 ) {
     unsafe {
         //kernel_print!("process create");
-
         let item = if !create_info.is_null() {
             let create_info: &PS_CREATE_NOTIFY_INFO = &*create_info;
             let create_info: &PS_CREATE_NOTIFY_INFO = &*create_info;
@@ -319,7 +323,9 @@ extern "system" fn OnProcessNotify(
             ProcessCreate {
                 pid: HandleToU32!(process_id),
                 parent_pid: HandleToU32!(create_info.ParentProcessId),
-                //command_line: image_file_name.as_rust_string().unwrap_or_default(),
+                command_line: ItemInfo::string_to_buffer(
+                    image_file_name.as_rust_string().unwrap_or_default(),
+                ),
             }
         } else {
             ProcessExit {
@@ -377,7 +383,7 @@ extern "system" fn OnImageLoadNotify(
             pid: HandleToU32!(process_id),
             load_address: image_info.ImageBase as isize,
             image_size: image_info.ImageSize,
-            // image_file_name: image_name,
+            image_file_name: ItemInfo::string_to_buffer(image_name),
         };
 
         push_item_thread_safe(item);
@@ -423,14 +429,13 @@ extern "system" fn OnRegistryNotify(_context: PVOID, arg1: PVOID, arg2: PVOID) -
                     }
 
                     let pre_info = &*(op_info.PreInformation as PREG_SET_VALUE_KEY_INFORMATION);
-                    let value_name = if let Some(value_name) =
-                        (*pre_info.ValueName).as_rust_string()
-                    {
-                        value_name
-                    } else {
-                        //log::info!("Something wrong. Can't convert \"value_name\" to rust string");
-                        break;
-                    };
+                    let _value_name =
+                        if let Some(value_name) = (*pre_info.ValueName).as_rust_string() {
+                            value_name
+                        } else {
+                            //log::info!("Something wrong. Can't convert \"value_name\" to rust string");
+                            break;
+                        };
 
                     let v = Vec::from_raw_parts(
                         pre_info.Data as *mut u8,
@@ -441,7 +446,7 @@ extern "system" fn OnRegistryNotify(_context: PVOID, arg1: PVOID, arg2: PVOID) -
                     let item = RegistrySetValue {
                         pid: HandleToU32!(PsGetCurrentProcessId()),
                         tid: HandleToU32!(PsGetCurrentThreadId()),
-                        // key_name,
+                        key_name: ItemInfo::string_to_buffer(key_name),
                         // value_name,
                         data_type: pre_info.DataType,
                         // data: v.clone(),
@@ -462,30 +467,23 @@ extern "system" fn OnRegistryNotify(_context: PVOID, arg1: PVOID, arg2: PVOID) -
 unsafe fn push_item_thread_safe(item: ItemInfo) {
     let _locker = AutoLock::new(&mut G_MUTEX);
     if let Some(events) = &mut G_EVENTS {
-        // if events.len() >= MAX_ITEM_COUNT {
-        //     events.pop_front();
-        // }
-        // events.push_back(item);
-        if events.len() < MAX_ITEM_COUNT {
-            events.push(item);
+        if events.len() >= MAX_ITEM_COUNT {
+            events.remove(0);
         }
-    }
-}
-
-unsafe fn log_items() {
-    let _locker = AutoLock::new(&mut G_MUTEX);
-    if let Some(events) = &mut G_EVENTS {
-        for elem in events {
-            log::info!("{:?}", elem);
-        }
+        events.push(item);
     }
 }
 
 unsafe fn copy_events_to_ptr(dst_ptr: *mut u8, buffer_size: usize) -> usize {
     let _locker = AutoLock::new(&mut G_MUTEX);
     if let Some(events) = &mut G_EVENTS {
-        let events_byte_size = events.len()*size_of::<ItemInfo>();
+        let events_byte_size = events.len() * size_of::<ItemInfo>();
         if events_byte_size > buffer_size {
+            log::info!(
+                "Buff to small: size: {}, necessary size: {}",
+                buffer_size,
+                events_byte_size
+            );
             return 0;
         }
 
