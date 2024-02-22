@@ -1,3 +1,5 @@
+/.idea/
+
 /common/.idea/
 /common/Cargo.lock
 /common/target/
