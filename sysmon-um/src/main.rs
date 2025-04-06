@@ -1,3 +1,5 @@
+mod error_msg;
+
 use crate::error_msg::print_last_error;
 use common::ItemInfo;
 use std::{mem::size_of, ptr::null_mut};
@@ -6,8 +8,6 @@ use windows_sys::Win32::{
     Foundation::{GENERIC_READ, INVALID_HANDLE_VALUE},
     Storage::FileSystem::{CreateFileA, ReadFile, OPEN_EXISTING},
 };
-
-mod error_msg;
 
 fn main() {
     println!("Hello, world!");
@@ -22,6 +22,7 @@ fn main() {
             0,
             0isize,
         ) as HANDLE;
+        println!("after!");
         if h_file == INVALID_HANDLE_VALUE {
             print_last_error("Failed to open file");
             return;

@@ -1,0 +1,9 @@
+[workspace]
+members = [ "sysmon-km",
+    "sysmon-um" ,
+    "common" ,
+    "xtask" ,
+]
+
+[workspace.dependencies]
+anyhow = "1"

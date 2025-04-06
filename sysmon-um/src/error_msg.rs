@@ -18,6 +18,7 @@ pub(crate) fn print_last_error(msg: &str) {
 
 pub(crate) fn get_error_as_string(error_msg_id: u32) -> Option<String> {
     unsafe {
+        println!("elo 1");
         let mut message_buffer = null_mut();
         let chars = FormatMessageW(
             FORMAT_MESSAGE_ALLOCATE_BUFFER
@@ -30,16 +31,16 @@ pub(crate) fn get_error_as_string(error_msg_id: u32) -> Option<String> {
             0,
             null_mut(),
         );
-
+        println!("elo 2");
         let msg = if chars > 0 {
             let parts = std::slice::from_raw_parts(message_buffer, chars as _);
             String::from_utf16(parts).ok()
         } else {
             None
         };
-
+        println!("elo 3");
         LocalFree(message_buffer as *mut c_void);
-
+        println!("elo 4");
         msg
     }
 }

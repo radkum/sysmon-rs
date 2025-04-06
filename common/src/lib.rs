@@ -1,11 +1,11 @@
 #![no_std]
 extern crate alloc;
 
-use core::fmt::Formatter;
 use alloc::string::String;
+use core::fmt::Formatter;
 
 pub const BUFF_SIZE: usize = 64;
-pub struct StringBuff([u8;BUFF_SIZE]);
+pub struct StringBuff([u8; BUFF_SIZE]);
 
 #[repr(C)]
 #[derive(Debug)]
