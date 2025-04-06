@@ -1,6 +1,6 @@
 #![no_std]
 #![allow(non_snake_case)]
-#![allow(static_mut_ref)]
+#![allow(static_mut_refs)]
 extern crate alloc;
 
 mod cleaner;
@@ -76,15 +76,16 @@ pub unsafe extern "system" fn DriverEntry(
     driver: &mut DRIVER_OBJECT,
     _path: *const UNICODE_STRING,
 ) -> NTSTATUS {
-    KernelLogger::init(LevelFilter::Info).expect("Failed to initialize logger");
+    KernelLogger::init(LevelFilter::Trace).expect("Failed to initialize logger");
     log::info!("START");
 
     G_MUTEX.Init();
 
     let mut events = Vec::new();
 
+    log::trace!("Before reverse");
     if let Err(e) = events.try_reserve_exact(MAX_ITEM_COUNT) {
-        log::info!(
+        log::error!(
             "fail to reserve a {} bytes of memory. Err: {:?}",
             ::core::mem::size_of::<ItemInfo>() * MAX_ITEM_COUNT,
             e
@@ -129,9 +130,10 @@ pub unsafe extern "system" fn DriverEntry(
         if NT_SUCCESS!(status) {
             cleaner.init_device(device_object);
         } else {
-            log::info!("failed to create device 0x{:08x}", status);
+            log::error!("failed to create device 0x{:08x}", status);
             break;
         }
+        log::info!("Device create!");
 
         (*device_object).Flags |= DO_DIRECT_IO as u32;
 
@@ -141,9 +143,10 @@ pub unsafe extern "system" fn DriverEntry(
         if NT_SUCCESS!(status) {
             cleaner.init_symlink(&sym_link);
         } else {
-            log::info!("failed to create sym_link 0x{:08x}", status);
+            log::error!("failed to create sym_link 0x{:08x}", status);
             break;
         }
+        log::info!("Device symlink!");
 
         //--------------------PROCESS NOTIFY-----------------------
         status = PsSetCreateProcessNotifyRoutineEx(OnProcessNotify, FALSE);
@@ -151,9 +154,10 @@ pub unsafe extern "system" fn DriverEntry(
         if NT_SUCCESS!(status) {
             cleaner.init_process_create_callback(OnProcessNotify);
         } else {
-            log::info!("failed to create process nofity rountine 0x{:08x}", status);
+            log::error!("failed to create process nofity rountine 0x{:08x}", status);
             break;
         }
+        log::info!("ProcessNotify created");
 
         //--------------------THREAD NOTIFY-----------------------
         status = PsSetCreateThreadNotifyRoutine(OnThreadNotify);
@@ -161,9 +165,10 @@ pub unsafe extern "system" fn DriverEntry(
         if NT_SUCCESS!(status) {
             cleaner.init_thread_create_callback(OnThreadNotify);
         } else {
-            log::info!("failed to create thread nofity rountine 0x{:08x}", status);
+            log::error!("failed to create thread nofity rountine 0x{:08x}", status);
             break;
         }
+        log::info!("ThreadNotify created");
 
         //--------------------IMAGE NOTIFY-----------------------
         status = PsSetLoadImageNotifyRoutine(OnImageLoadNotify);
@@ -171,9 +176,10 @@ pub unsafe extern "system" fn DriverEntry(
         if NT_SUCCESS!(status) {
             cleaner.init_image_load_callback(OnImageLoadNotify);
         } else {
-            log::info!("failed to create image load routine 0x{:08x}", status);
+            log::error!("failed to create image load routine 0x{:08x}", status);
             break;
         }
+        log::info!("ImageNotify created");
 
         //--------------------REGISTRY NOTIFY-----------------------
         let altitude = UNICODE_STRING::create("7657.124");
@@ -189,9 +195,11 @@ pub unsafe extern "system" fn DriverEntry(
         if NT_SUCCESS!(status) {
             cleaner.init_registry_callback(G_COOKIE);
         } else {
-            log::info!("failed to create registry routine 0x{:08x}", status);
+            log::error!("failed to create registry routine 0x{:08x}", status);
             break;
         }
+        log::info!("RegistryNotify created");
+
         break;
     }
 
@@ -429,19 +437,24 @@ extern "system" fn OnRegistryNotify(_context: PVOID, arg1: PVOID, arg2: PVOID) -
                     }
 
                     let pre_info = &*(op_info.PreInformation as PREG_SET_VALUE_KEY_INFORMATION);
-                    let _value_name =
-                        if let Some(value_name) = (*pre_info.ValueName).as_rust_string() {
-                            value_name
-                        } else {
-                            //log::info!("Something wrong. Can't convert \"value_name\" to rust string");
-                            break;
-                        };
+                    let _value_name = if let Some(value_name) =
+                        (*pre_info.ValueName).as_rust_string()
+                    {
+                        value_name
+                    } else {
+                        log::error!("Something wrong. Can't convert \"value_name\" to rust string");
+                        break;
+                    };
 
-                    let v = Vec::from_raw_parts(
-                        pre_info.Data as *mut u8,
-                        pre_info.DataSize as usize,
-                        pre_info.DataSize as usize,
-                    );
+                    // let v = if pre_info.DataSize > 0 {
+                    //     Vec::from_raw_parts(
+                    //         pre_info.Data as *mut u8,
+                    //         pre_info.DataSize as usize,
+                    //         pre_info.DataSize as usize,
+                    //     )
+                    // } else {
+                    //     Vec::new()
+                    // };
 
                     let item = RegistrySetValue {
                         pid: HandleToU32!(PsGetCurrentProcessId()),
@@ -452,7 +465,7 @@ extern "system" fn OnRegistryNotify(_context: PVOID, arg1: PVOID, arg2: PVOID) -
                         // data: v.clone(),
                     };
 
-                    forget(v);
+                    //forget(v);
                     push_item_thread_safe(item);
                 }
                 break;
